@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OfferLane - app</title>
+<style>
+  :root { --bg:#0c1416; --card:#132024; --card2:#0f1a1d; --line:#1e3237; --ink:#e8f4f2; --dim:#8fb3ad; --teal:#5eead4; --amber:#fbbf24; --red:#fca5a5; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width:760px; margin:0 auto; padding:28px 20px 64px; }
+  header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:22px; }
+  header h1 { font-size:26px; margin:0; }
+  header h1 span { color:var(--teal); }
+  header a { color:var(--dim); text-decoration:none; font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; margin:0 0 18px; }
+  .card h2 { margin:0 0 14px; font-size:18px; }
+  label { display:block; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:var(--dim); margin:0 0 6px; }
+  input, select { width:100%; background:var(--card2); border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:10px 12px; font-size:16px; }
+  .row3 { display:grid; grid-template-columns:1fr 1fr auto; gap:14px; align-items:end; }
+  button { background:var(--teal); color:#06231e; border:0; font-weight:700; border-radius:10px; padding:11px 22px; font-size:16px; cursor:pointer; }
+  .mini { padding:6px 12px; font-size:13px; border-radius:8px; margin-left:6px; background:var(--card2); color:var(--teal); border:1px solid var(--line); }
+  .mini.reject { color:var(--red); }
+  .stats { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; }
+  .stat { background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .stat b { display:block; font-size:22px; color:var(--teal); font-variant-numeric:tabular-nums; }
+  .stat span { color:var(--dim); font-size:12px; }
+  .app { padding:12px 4px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  .app .nm { font-size:16px; }
+  .app .sub { color:var(--dim); font-size:13px; margin-top:2px; }
+  .pill { padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
+  .pill.applied { background:#1a2733; color:#93c5fd; }
+  .pill.screen { background:#12312c; color:var(--teal); }
+  .pill.interview { background:#2c1a3a; color:#d8b4fe; }
+  .pill.offer { background:#3a2c07; color:var(--amber); }
+  .pill.accepted { background:#12312c; color:var(--teal); }
+  .pill.rejected { background:#3a1414; color:var(--red); }
+  .nudge { color:var(--red); font-size:13px; margin-top:2px; }
+  .ok-line { color:var(--dim); font-size:13px; margin-top:2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Offer<span>Lane</span></h1>
+    <a href="index.html">&larr; Home</a>
+  </header>
+
+  <div class="card">
+    <h2>Add an application</h2>
+    <div class="row3">
+      <div><label for="f-company">Company</label><input id="f-company" type="text" placeholder="Acme"></div>
+      <div><label for="f-role">Role</label><input id="f-role" type="text" placeholder="Backend engineer"></div>
+      <button id="f-add">Add</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Funnel</h2>
+    <div class="stats">
+      <div class="stat"><b id="s-active">0</b><span>active</span></div>
+      <div class="stat"><b id="s-screen">0%</b><span>screen rate</span></div>
+      <div class="stat"><b id="s-interview">0%</b><span>interview rate</span></div>
+      <div class="stat"><b id="s-offer">0%</b><span>offer rate</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Your lanes</h2>
+    <div id="apps"><p class="ok-line" style="padding:10px 4px">No applications yet.</p></div>
+  </div>
+</div>
+<script src="engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  var KEY = 'offerlane-data';
+  var $ = function (id) { return document.getElementById(id); };
+  function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } }
+  function save(apps) { localStorage.setItem(KEY, JSON.stringify(apps)); }
+
+  function nextStages(stage) {
+    var out = [];
+    if (LaneEngine.isTerminal(stage)) return out;
+    var i = LaneEngine.stageIndex(stage);
+    out.push(LaneEngine.STAGES[i + 1]);
+    out.push('rejected');
+    return out;
+  }
+
+  function advance(id, to) {
+    var apps = load();
+    for (var i = 0; i < apps.length; i++) {
+      if (apps[i].id === id) {
+        var next = LaneEngine.addEvent(apps[i], to, new Date().toISOString());
+        if (next) apps[i] = next;
+      }
+    }
+    save(apps); render();
+  }
+
+  function render() {
+    var apps = load();
+    var f = LaneEngine.funnel(apps);
+    $('s-active').textContent = f.active;
+    $('s-screen').textContent = f.screenRate + '%';
+    $('s-interview').textContent = f.interviewRate + '%';
+    $('s-offer').textContent = f.offerRate + '%';
+    var box = $('apps'); box.innerHTML = '';
+    if (!apps.length) { box.innerHTML = '<p class="ok-line" style="padding:10px 4px">No applications yet.</p>'; return; }
+    var sorted = apps.slice().sort(function (a, b) {
+      var fa = LaneEngine.followUp(a, new Date()), fb = LaneEngine.followUp(b, new Date());
+      return (fa.needed === fb.needed) ? (a.company < b.company ? -1 : 1) : (fa.needed ? -1 : 1);
+    });
+    sorted.forEach(function (a) {
+      var fu = LaneEngine.followUp(a, new Date());
+      var div = document.createElement('div');
+      div.className = 'app';
+      var l = document.createElement('div');
+      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = a.company + ' - ' + a.role;
+      var sub = document.createElement('div');
+      sub.className = fu.needed ? 'nudge' : 'sub';
+      sub.textContent = fu.reason === 'closed' ? 'closed ' + LaneEngine.isoLocal(new Date(a.lastEventAt))
+        : fu.needed ? 'follow up now - ' + fu.ageDays + ' days of silence'
+        : fu.ageDays + ' days in stage, follow up in ' + fu.daysLeft;
+      l.appendChild(nm); l.appendChild(sub);
+      var r = document.createElement('div');
+      var p = document.createElement('span'); p.className = 'pill ' + a.stage; p.textContent = LaneEngine.LABELS[a.stage];
+      r.appendChild(p);
+      nextStages(a.stage).forEach(function (s) {
+        var b = document.createElement('button');
+        b.className = 'mini' + (s === 'rejected' ? ' reject' : '');
+        b.textContent = s === 'rejected' ? 'reject' : '-> ' + LaneEngine.LABELS[s];
+        b.addEventListener('click', function () { advance(a.id, s); });
+        r.appendChild(b);
+      });
+      div.appendChild(l); div.appendChild(r); box.appendChild(div);
+    });
+  }
+
+  $('f-add').addEventListener('click', function () {
+    var c = $('f-company').value.trim(), r = $('f-role').value.trim();
+    if (!c) return;
+    var apps = load();
+    apps.push(LaneEngine.newApp(Date.now(), c, r || 'role', new Date().toISOString()));
+    save(apps);
+    $('f-company').value = ''; $('f-role').value = '';
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
